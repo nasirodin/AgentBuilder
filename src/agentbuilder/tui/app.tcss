@@ -1,0 +1,28 @@
+#chat {
+    height: 1fr;
+    padding: 0 1;
+}
+
+UserBubble {
+    margin: 1 0 0 8;
+    padding: 0 1;
+    background: $primary 20%;
+}
+
+AssistantBubble {
+    margin: 1 8 0 0;
+    padding: 0 1;
+    background: $surface;
+}
+
+Thinking {
+    margin: 1 0 0 0;
+    padding: 0 1;
+    color: $text-muted;
+}
+
+ErrorBubble {
+    margin: 1 0 0 0;
+    padding: 0 1;
+    color: $error;
+}
