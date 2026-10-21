@@ -50,9 +50,10 @@ def _google_cloud_provider(settings: Settings) -> GoogleCloudProvider:
         )
         project = project or credentials.project_id
     key = settings.google_api_key
-    use_key = key is not None and credentials is None and project is None
+    if credentials is not None or project is not None:
+        key = None  # credentials/project mean ADC; a key would switch to Express Mode
     return GoogleCloudProvider(
-        api_key=key.get_secret_value() if use_key else None,
+        api_key=key.get_secret_value() if key else None,
         credentials=credentials,
         project=project,
         location=settings.google_cloud_location,

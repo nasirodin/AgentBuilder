@@ -30,7 +30,9 @@ uv run agentbuilder
 ```sh
 uv run ruff check .            # lint (add --fix to auto-fix)
 uv run ruff format .           # format (use --check in CI)
+uv run pyright                 # type check
 ```
 
 The same checks run in GitHub Actions on every push and pull request
-(`.github/workflows/lint.yml`). Rules and settings are in `[tool.ruff]` in `pyproject.toml`.
+(`.github/workflows/lint.yml`, `.github/workflows/typecheck.yml`). Settings are in
+`[tool.ruff]` and `[tool.pyright]` in `pyproject.toml`.

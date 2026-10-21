@@ -1,0 +1,25 @@
+name: Type check
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  pyright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      # Full install: pyright needs the runtime dependencies to resolve imports.
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Pyright
+        run: uv run --no-sync pyright

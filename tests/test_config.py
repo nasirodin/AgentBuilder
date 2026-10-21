@@ -27,6 +27,7 @@ def test_reads_env_and_secret_files(isolated) -> None:
     (isolated / ".secret").write_text("ANTHROPIC_API_KEY=sk-test\n")
     s = Settings()
     assert s.model == "anthropic:claude-sonnet-5-5"
+    assert s.anthropic_api_key is not None
     assert s.anthropic_api_key.get_secret_value() == "sk-test"
     assert "sk-test" not in repr(s)
 
@@ -37,8 +38,9 @@ def test_environment_overrides_files(isolated, monkeypatch) -> None:
     assert Settings().model == "test"
 
 
-def test_resolve_model_uses_settings_key() -> None:
-    model = resolve_model(Settings(model="anthropic:claude-opus-5-5", ANTHROPIC_API_KEY="sk-test"))
+def test_resolve_model_uses_settings_key(isolated) -> None:
+    (isolated / ".secret").write_text("ANTHROPIC_API_KEY=sk-test\n")
+    model = resolve_model(Settings(model="anthropic:claude-opus-5-5"))
     assert isinstance(model, AnthropicModel)
     assert model.model_name == "claude-opus-5-5"
     assert isinstance(resolve_model(Settings(model="test")), TestModel)
@@ -60,6 +62,7 @@ def test_resolve_vertex_model(isolated, prefix) -> None:
 def test_resolve_google_model(isolated) -> None:
     (isolated / ".secret").write_text("GEMINI_API_KEY=g-test\n")
     settings = Settings(model="google:gemini-3.8-flash")
+    assert settings.google_api_key is not None
     assert settings.google_api_key.get_secret_value() == "g-test"
     model = resolve_model(settings)
     assert isinstance(model, GoogleModel)

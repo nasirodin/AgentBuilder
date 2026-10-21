@@ -9,6 +9,7 @@ from textual.app import App, ComposeResult
 from textual.binding import BindingType
 from textual.containers import VerticalScroll
 from textual.widgets import Footer, Header, Input, Markdown, Static
+from textual.widgets.markdown import MarkdownStream
 
 from agentbuilder.orchestrator.events import AssistantDelta, AssistantMessage, Error, UserMessage
 from agentbuilder.orchestrator.session import Session
@@ -73,13 +74,12 @@ class AgentBuilderApp(App[None]):
     @work(exclusive=True)
     async def run_turn(self, message: UserMessage, thinking: Thinking) -> None:
         chat = self.query_one("#chat", VerticalScroll)
-        reply: AssistantBubble | None = None
-        stream = None
+        stream: MarkdownStream | None = None
         try:
             async for ev in self.session.send(message):
                 match ev:
                     case AssistantDelta(text=text):
-                        if reply is None:  # first chunk: swap the spinner for the reply
+                        if stream is None:  # first chunk: swap the spinner for the reply
                             reply = AssistantBubble()
                             await chat.mount(reply, before=thinking)
                             await thinking.remove()
