@@ -24,3 +24,13 @@ uv run agentbuilder
   `GOOGLE_APPLICATION_CREDENTIALS` in `.secret`.
 - `Ctrl+L` clears the screen, `Ctrl+Q` quits.
 - Tests: `uv run pytest`.
+
+## Lint
+
+```sh
+uv run ruff check .            # lint (add --fix to auto-fix)
+uv run ruff format .           # format (use --check in CI)
+```
+
+The same checks run in GitHub Actions on every push and pull request
+(`.github/workflows/lint.yml`). Rules and settings are in `[tool.ruff]` in `pyproject.toml`.

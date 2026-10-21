@@ -21,8 +21,30 @@ build-backend = "uv_build"
 dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
+    "ruff>=0.17.1",
 ]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.format]
+# Leave hand-formatted code snippets in Markdown (design docs, README) alone.
+exclude = ["*.md"]
+
+[tool.ruff.lint]
+# Explicit list so a ruff upgrade can't silently change what CI enforces.
+select = [
+    "E", "W",  # pycodestyle
+    "F",       # pyflakes
+    "I",       # isort
+    "UP",      # pyupgrade
+    "B",       # bugbear
+    "BLE",     # blind except
+    "SIM",     # simplify
+    "RUF",     # ruff-specific
+]

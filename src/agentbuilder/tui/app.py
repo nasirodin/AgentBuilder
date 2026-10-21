@@ -1,10 +1,12 @@
 """Textual chat UI. A thin client of the session's event stream (see design/06-tui.md)."""
 
 import time
+from typing import ClassVar
 
 from rich.spinner import Spinner
 from textual import work
 from textual.app import App, ComposeResult
+from textual.binding import BindingType
 from textual.containers import VerticalScroll
 from textual.widgets import Footer, Header, Input, Markdown, Static
 
@@ -40,7 +42,10 @@ class Thinking(Static):
 class AgentBuilderApp(App[None]):
     TITLE = "AgentBuilder"
     CSS_PATH = "app.tcss"
-    BINDINGS = [("ctrl+q", "quit", "Quit"), ("ctrl+l", "clear", "Clear screen")]
+    BINDINGS: ClassVar[list[BindingType]] = [
+        ("ctrl+q", "quit", "Quit"),
+        ("ctrl+l", "clear", "Clear screen"),
+    ]
 
     def __init__(self, session: Session) -> None:
         super().__init__()

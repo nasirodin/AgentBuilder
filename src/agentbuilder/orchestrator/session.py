@@ -27,15 +27,13 @@ class Session:
         """Run one turn and yield UI events as the reply streams in."""
         chunks: list[str] = []
         try:
-            async with self.agent.run_stream(
-                message.text, message_history=self.history
-            ) as result:
+            async with self.agent.run_stream(message.text, message_history=self.history) as result:
                 # No debounce: forward chunks as they arrive; the UI batches its own redraws.
                 async for delta in result.stream_text(delta=True, debounce_by=None):
                     chunks.append(delta)
                     yield AssistantDelta(text=delta)
                 self.history = result.all_messages()
-        except Exception as exc:  # surfaced to the user, history left unchanged
+        except Exception as exc:  # noqa: BLE001 - surfaced to the user, history left unchanged
             yield Error(message=f"{type(exc).__name__}: {exc}")
             return
         yield AssistantMessage(text="".join(chunks))
