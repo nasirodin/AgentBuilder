@@ -2,11 +2,18 @@ version = 1
 revision = 3
 requires-python = ">=3.14"
 
+[manifest]
+members = [
+    "agentbuilder",
+    "agentbuilder-sandbox",
+]
+
 [[package]]
 name = "agentbuilder"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "agentbuilder-sandbox" },
     { name = "pydantic-ai-slim", extra = ["anthropic", "google"] },
     { name = "pydantic-settings" },
     { name = "textual" },
@@ -22,6 +29,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "agentbuilder-sandbox", editable = "packages/sandbox" },
     { name = "pydantic-ai-slim", extras = ["anthropic", "google"], specifier = ">=2.59.0" },
     { name = "pydantic-settings", specifier = ">=2.16.1" },
     { name = "textual", specifier = ">=4" },
@@ -34,6 +42,17 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
     { name = "ruff", specifier = ">=0.17.1" },
 ]
+
+[[package]]
+name = "agentbuilder-sandbox"
+version = "0.1.0"
+source = { editable = "packages/sandbox" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic", specifier = ">=2.12" }]
 
 [[package]]
 name = "annotated-types"

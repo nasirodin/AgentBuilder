@@ -24,8 +24,10 @@ What we borrow from `srt` (semantics, not code):
   sockets bind-mounted into the sandbox and bridged to loopback ports inside it.
 - Domain allow/deny lists with wildcards and ports; resolved-address filtering against
   loopback, link-local, metadata endpoints (DNS-rebinding defence).
-- seccomp filter blocking creation of `AF_UNIX` sockets by the sandboxed command.
-- A mandatory deny-write list for dangerous files inside writable areas.
+- seccomp filter blocking `AF_UNIX`/`AF_VSOCK` sockets, `io_uring`, new user/mount
+  namespaces and the mount API (D12).
+- A mandatory deny-write list for dangerous files inside writable areas, with ancestor
+  directories pinned so they cannot be renamed aside.
 
 ## Platforms
 
@@ -42,20 +44,16 @@ AgentBuilder, so it can be tested and reused on its own:
 
 ```
 packages/sandbox/src/agentbuilder_sandbox/
-  policy.py         # SandboxPolicy, FilesystemPolicy, NetworkPolicy (Pydantic)
-  runtime.py        # Sandbox: start/stop, exec, exec_stream
+  policy.py         # SandboxPolicy, FilesystemPolicy, NetworkPolicy, ResourceLimits (Pydantic)
+  runtime.py        # Sandbox: start/stop/exec, ExecResult, check_host, rlimits, timeouts
   linux/
     bwrap.py        # policy -> bubblewrap argv (mount plan)
-    seccomp.py      # BPF filter (deny socket(AF_UNIX, ...)) built with ctypes
-  macos/
-    seatbelt.py     # policy -> Seatbelt profile (later)
+    seccomp.py      # classic-BPF filter assembled by hand (x86-64, aarch64)
   net/
-    filter.py       # domain matching, resolved-address checks, decision + reason
-    http_proxy.py   # asyncio HTTP proxy (CONNECT + plain HTTP)
-    socks_proxy.py  # asyncio SOCKS5 proxy (CONNECT only)
-  bridge.py         # runs INSIDE the sandbox: loopback ports <-> host Unix sockets
-  limits.py         # rlimits, cgroups (systemd-run --user), timeouts, process-group kill
-  violations.py     # collect/parse violations (network: exact; filesystem: heuristic)
+    filter.py       # host canonicalisation, domain rules, decisions, resolved-address guard
+    proxy.py        # asyncio HTTP (CONNECT + absolute URI) and SOCKS5 on one Unix socket
+  bridge.py         # runs INSIDE the sandbox: loopback ports <-> host sockets; isolation
+  violations.py     # violations (network: exact; filesystem/socket: stderr heuristics)
   dangerous.py      # mandatory deny-write list
   cli.py            # `abx-sandbox [--policy file] -- <cmd>` for manual testing
 ```
@@ -70,6 +68,7 @@ class FilesystemPolicy(BaseModel):
     allow_read: list[Path] = []     # re-opened read-only inside deny_read regions
     allow_write: list[Path] = []    # writable; everything else read-only
     deny_write: list[Path] = []     # read-only even inside allow_write (deny wins)
+    scratch_write: list[Path] = []  # writable without dangerous-file protection (sandbox HOME)
 
 class NetworkPolicy(BaseModel):
     allowed_domains: list[str] = []         # "pypi.org", "*.pythonhosted.org", "api.x.com:443"
@@ -113,9 +112,15 @@ bwrap
   -- python -m agentbuilder_sandbox.bridge --spec <fd> -- <cmd...>
 ```
 
-- `deny_write` targets must exist before mounting; the runtime creates protected paths
-  (empty files/dirs) during workspace bootstrap.
 - The `python` used for the bridge is the host interpreter, visible read-only.
+
+As built (D12):
+- Pins (directories above write-denied paths) follow `--ro-bind / /`.
+- Rule mounts (3–6) are emitted shallow-first, so the more specific rule wins.
+- A `deny_write` target that does not exist gets a placeholder (an empty file, or a directory
+  for a missing parent) that bubblewrap creates and the runtime removes once no exec is running.
+- The proxy socket is per exec: `<session>/sock/<exec_id>.sock`.
+- The bridge is run as `python -I -S bridge.py <base64 spec>`.
 
 ### In-sandbox bridge
 
@@ -126,19 +131,31 @@ Inside the new network namespace there is only loopback. `bridge.py` (trusted co
 2. Forks the target command with `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` pointing at the
    loopback ports, `NO_PROXY=127.0.0.1`, and `SANDBOX_SVC_<NAME>_URL=http://127.0.0.1:<port>`
    per service.
-3. In the child, before `exec`: sets `PR_SET_NO_NEW_PRIVS` and installs the seccomp filter
-   (`socket(AF_UNIX, …)` → `EPERM`). The bridge itself is not filtered, the command is.
-   `socketpair` stays allowed (asyncio and many runtimes need it).
+3. The child creates a user+pid+mount namespace, after srt's `apply-seccomp`.
+   - Its pid 1 mounts a fresh `/proc`, sets `max_user_namespaces=0` and forks the command.
+   - The command sets `PR_SET_NO_NEW_PRIVS` and installs the seccomp filter before `exec`.
+   - The bridge itself is not filtered, but it is non-dumpable and invisible to the command.
+   - `socketpair` stays allowed (asyncio and many runtimes need it).
 4. Propagates exit code and signals; exits when the command exits.
 
 Even if the command kills the bridge, it only loses its own network access.
 
 ### seccomp
 
-The filter is tiny (arch check, `socket` syscall with `arg0 == AF_UNIX` → `ERRNO(EPERM)`,
-else allow). We hand-assemble the classic-BPF program with `struct` and install it via
-`ctypes` (`prctl` + `seccomp`), for x86-64 and aarch64. No libseccomp dependency. Unknown
-architecture → refuse to start unless the policy explicitly disables `block_unix_sockets`.
+The filter (D12, after srt's `seccomp-unix-block.c`):
+
+| Syscall | Result |
+|---------|--------|
+| any syscall from a foreign architecture, or an x32 syscall | kill |
+| `socket(AF_UNIX \| AF_VSOCK)`, `io_uring_*` | `EPERM` |
+| `unshare` / `clone` with `CLONE_NEWUSER \| CLONE_NEWNS` | `EPERM` |
+| `setns`, `mount`, `umount2`, `pivot_root`, the new mount API | `EPERM` |
+| `clone3` | `ENOSYS` |
+| everything else | allow |
+
+The host hand-assembles the classic-BPF program with `struct` for x86-64 and aarch64, with no
+libseccomp. The bridge installs it via `ctypes` `prctl`. On an unknown architecture the sandbox
+refuses to start. Tests run the program in a small BPF interpreter.
 
 Why it matters even with `--unshare-net`: pathname sockets live on the filesystem, so
 something like the user's D-Bus session socket or a Docker socket would be reachable through
@@ -147,12 +164,11 @@ defence in depth.
 
 ## Host-side network proxies
 
-Per session, the runtime starts on the host (asyncio, in AgentBuilder's process):
+Per exec (D12), the runtime starts on the host (asyncio, in AgentBuilder's process):
 
 | Proxy | Listens on | Does |
 |-------|------------|------|
-| HTTP | `<session>/sock/http.sock` | `CONNECT host:port` tunnels and absolute-URI HTTP requests; filters by host/port. |
-| SOCKS5 | `<session>/sock/socks.sock` | `CONNECT` only (no BIND/UDP); filters by host/port. |
+| HTTP + SOCKS5 | `<session>/sock/<exec_id>.sock`; a first byte of 0x05 means SOCKS5 | HTTP: `CONNECT host:port` tunnels, and absolute `http://` requests (one per connection). SOCKS5: `CONNECT` only, no BIND/UDP. Both filter by host and port. |
 | Model *(service, provided by AgentBuilder, not the sandbox package)* | `<session>/sock/model.sock` | Reverse proxy to LLM providers; injects real API keys; meters tokens/cost; enforces model allowlist and budget. |
 
 Filtering (`net/filter.py`):
@@ -183,13 +199,22 @@ No TLS interception: decisions use the `CONNECT` target (or SOCKS destination) h
 | env | `PATH`, `HOME=<session>/tmp`, `UV_CACHE_DIR`, `UV_PYTHON_INSTALL_DIR`, `UV_NO_MANAGED_PYTHON_DOWNLOADS`, proxy vars, service URLs. Nothing inherited. |
 
 **Dangerous files** (always deny-write inside writable areas, because the *user's* tools on the
-host may act on them): `.git/` (hooks, config), `.envrc`, `.vscode/`, `.idea/`,
-`.pre-commit-config.yaml`, `.bashrc`/`.zshrc`/`.profile`, `.python-version` after bootstrap,
-`sitecustomize.py`/`usercustomize.py` outside `.venv`. The list lives in `dangerous.py`.
+host may act on them):
+- `.git/hooks` and `.git/config`, or a worktree's `.git` file
+- `.vscode/`, `.idea/`, `.claude/commands|agents`
+- `.envrc`, `.mcp.json`, `.gitconfig`, `.gitmodules`, `.ripgreprc`, `.pre-commit-config.yaml`
+- shell rc files
+- `sitecustomize.py` / `usercustomize.py`
+
+At a write root they are protected even when absent, using placeholders. Below the root they
+are protected where they exist, up to 3 levels deep. Roots listed in `scratch_write` are
+exempt. The list lives in `dangerous.py`.
 
 ## Resource limits & process control
 
-`bwrap` restricts *what* is reachable, not *how much* is consumed. `limits.py` adds:
+`bwrap` restricts *what* is reachable, not *how much* is consumed. The plan (built so far, in
+`runtime.py`: rlimits without NPROC, which counts all of the user's processes; timeout by
+SIGKILL to bwrap's process group; head+tail output caps; a concurrency semaphore):
 
 - **rlimits** via `resource.setrlimit` in the `preexec_fn` before `bwrap` starts:
   `RLIMIT_AS`, `RLIMIT_NPROC`, `RLIMIT_CPU`, `RLIMIT_FSIZE`, `RLIMIT_NOFILE`, `RLIMIT_CORE=0`.

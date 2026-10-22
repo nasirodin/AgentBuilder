@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     model: str = "anthropic:claude-opus-5-5"
     """Pydantic AI model string; `test` runs offline with canned replies."""
 
+    data_dir: Path = Path.home() / ".agentbuilder"
+    """Sessions (workspace + sandbox scratch) live in `<data_dir>/sessions/<id>`."""
+    sandbox_allowed_domains: list[str] = []
+    """Domains sandboxed commands may reach, e.g. `["pypi.org", "files.pythonhosted.org"]`
+    (JSON list in `.env`). Empty: no network."""
+
     # Vertex AI (`google-cloud:` / `google-vertex:` models). Standard Google names, no prefix.
     google_cloud_project: str | None = Field(default=None, validation_alias="GOOGLE_CLOUD_PROJECT")
     google_cloud_location: str = Field(default="global", validation_alias="GOOGLE_CLOUD_LOCATION")

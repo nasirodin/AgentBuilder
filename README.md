@@ -25,6 +25,24 @@ uv run agentbuilder
 - `Ctrl+L` clears the screen, `Ctrl+Q` quits.
 - Tests: `uv run pytest`.
 
+## Sandbox
+
+The builder's `run_bash` tool runs commands in `packages/sandbox`
+(`agentbuilder_sandbox`). It is a Python re-implementation of the model of Anthropic's
+[sandbox-runtime](https://github.com/anthropics/sandbox-runtime): bubblewrap namespaces, a
+seccomp filter and host-side filtering proxies (see [design/04-sandbox.md](design/04-sandbox.md)).
+
+- **Platforms:** Linux or WSL2 only, with `bwrap` ≥ 0.5 (`sudo apt-get install bubblewrap`).
+  On native Windows the tools report that the sandbox is unavailable and run nothing. To use
+  them, run AgentBuilder inside WSL.
+- **Sessions:** each run gets a session in `~/.agentbuilder/sessions/<id>/`. Its `workspace/`
+  is the agent's working tree.
+- **Network:** none by default. Allow domains in `.env`, e.g.
+  `AGENTBUILDER_SANDBOX_ALLOWED_DOMAINS=["pypi.org","files.pythonhosted.org"]`.
+- **Manual testing:** `uv run abx-sandbox -- sh -c 'cat ~/.ssh/id_rsa; curl -sI https://example.com'`
+- **Escape tests:** `packages/sandbox/tests/test_integration.py` is skipped where bubblewrap is
+  missing. Run `uv run pytest` inside WSL to exercise it.
+
 ## Lint
 
 ```sh

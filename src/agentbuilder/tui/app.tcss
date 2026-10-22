@@ -26,3 +26,10 @@ ErrorBubble {
     padding: 0 1;
     color: $error;
 }
+
+ToolBubble {
+    margin: 1 8 0 2;
+    padding: 0 1;
+    color: $text-muted;
+    border-left: tall $accent;
+}

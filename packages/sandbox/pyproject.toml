@@ -1,0 +1,15 @@
+[project]
+name = "agentbuilder-sandbox"
+version = "0.1.0"
+description = "Process sandbox (bubblewrap + seccomp + filtering proxies) modelled on Anthropic's sandbox-runtime"
+requires-python = ">=3.14"
+dependencies = [
+    "pydantic>=2.12",
+]
+
+[project.scripts]
+abx-sandbox = "agentbuilder_sandbox.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.10,<0.11"]
+build-backend = "uv_build"

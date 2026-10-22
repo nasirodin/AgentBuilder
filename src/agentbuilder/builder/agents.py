@@ -1,5 +1,6 @@
 """Builder agents. Only the main (front desk) agent exists so far."""
 
+from collections.abc import Sequence
 from pathlib import Path
 
 from google.oauth2 import service_account
@@ -11,6 +12,7 @@ from pydantic_ai.models.test import TestModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.providers.google_cloud import GoogleCloudProvider
+from pydantic_ai.toolsets import AbstractToolset
 
 from agentbuilder.config import Settings, get_settings
 
@@ -61,7 +63,9 @@ def _google_cloud_provider(settings: Settings) -> GoogleCloudProvider:
 
 
 def build_main_agent(
-    model: Model | str | None = None, settings: Settings | None = None
+    model: Model | str | None = None,
+    settings: Settings | None = None,
+    toolsets: Sequence[AbstractToolset[None]] = (),
 ) -> Agent[None, str]:
     if model is None:
         model = resolve_model(settings or get_settings())
@@ -69,4 +73,6 @@ def build_main_agent(
         model,
         instructions=(PROMPTS_DIR / "main.md").read_text(encoding="utf-8"),
         name="main",
+        deps_type=type(None),
+        toolsets=toolsets,
     )

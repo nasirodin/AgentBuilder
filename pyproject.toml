@@ -5,6 +5,7 @@ description = "Terminal app that builds, probes and fixes Pydantic AI agents in 
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "agentbuilder-sandbox",
     "pydantic-ai-slim[anthropic,google]>=2.59.0",
     "pydantic-settings>=2.16.1",
     "textual>=4",
@@ -17,6 +18,12 @@ agentbuilder = "agentbuilder.__main__:main"
 requires = ["uv_build>=0.10,<0.11"]
 build-backend = "uv_build"
 
+[tool.uv.workspace]
+members = ["packages/sandbox"]
+
+[tool.uv.sources]
+agentbuilder-sandbox = { workspace = true }
+
 [dependency-groups]
 dev = [
     "pyright>=1.1.414",
@@ -27,16 +34,18 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests"]
+testpaths = ["tests", "packages/sandbox/tests"]
 
 [tool.pyright]
 # Standard mode; missing stubs are noise for the untyped deps we use.
-include = ["src", "tests"]
+include = ["src", "tests", "packages/sandbox/src", "packages/sandbox/tests"]
 pythonVersion = "3.14"
 typeCheckingMode = "standard"
 reportMissingTypeStubs = false
 venvPath = "."
 venv = ".venv"
+# Target platform is Linux/WSL2 (design D9); the sandbox package uses Linux-only APIs.
+pythonPlatform = "Linux"
 
 [tool.ruff]
 line-length = 100
@@ -58,3 +67,6 @@ select = [
     "SIM",     # simplify
     "RUF",     # ruff-specific
 ]
+
+[tool.ruff.lint.isort]
+known-first-party = ["agentbuilder", "agentbuilder_sandbox"]

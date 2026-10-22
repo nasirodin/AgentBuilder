@@ -26,6 +26,24 @@ class AssistantMessage(BaseModel):
     text: str
 
 
+class ToolCall(BaseModel):
+    """Orchestrator -> UI: the agent called a tool."""
+
+    kind: Literal["tool_call"] = "tool_call"
+    id: str
+    name: str
+    args: dict[str, object]
+
+
+class ToolResult(BaseModel):
+    """Orchestrator -> UI: a tool call finished."""
+
+    kind: Literal["tool_result"] = "tool_result"
+    id: str
+    name: str
+    content: str
+
+
 class Error(BaseModel):
     """Orchestrator -> UI: the turn failed."""
 
@@ -33,4 +51,4 @@ class Error(BaseModel):
     message: str
 
 
-type UIEvent = AssistantDelta | AssistantMessage | Error
+type UIEvent = AssistantDelta | AssistantMessage | ToolCall | ToolResult | Error

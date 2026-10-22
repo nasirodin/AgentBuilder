@@ -113,3 +113,55 @@ fsck, schema validation and permission approval.
 checksum files (commit SHA is the content hash). All git invocations on untrusted repos must use
 the hardened config (no hooks, filters, fsmonitor, submodules). Remote/team registries can later
 be plain git remotes.
+
+### D12 — Sandbox hardening from the srt review; implementation choices
+**Status:** accepted · 2026-10-22 · refines D9
+**Context:** Reviewing sandbox-runtime (commit `aceba12`) for the first implementation of
+`agentbuilder_sandbox` showed gaps in the 04-sandbox plan:
+- Blocking only `socket(AF_UNIX)` is not enough:
+  - A command that creates a user namespace gets full capabilities over a copy of the mount
+    tree, and can remove every read-only bind, i.e. every write deny.
+  - `AF_VSOCK` is not fenced by the network namespace.
+  - `io_uring` can create sockets without calling `socket()`.
+- A bridge that is unfiltered, runs as the same uid and shares the command's PID namespace can
+  be ptraced by the command. The command then gets the bridge's power to open Unix sockets.
+- The dangerous-file list was shorter than srt's, and nothing stopped a protected directory
+  from being renamed aside (`mv .git x`).
+
+**Decision:**
+- **seccomp filter.** One default-allow filter, hand-assembled. It returns:
+  - `EPERM` for `socket(AF_UNIX|AF_VSOCK)` and `io_uring_*`;
+  - `EPERM` for `unshare`/`clone` with `CLONE_NEWUSER|CLONE_NEWNS`, for `setns` and for the
+    whole mount API;
+  - `ENOSYS` for `clone3`.
+
+  A foreign architecture or an x32 syscall kills the process. The host builds the BPF program
+  and passes it to the bridge.
+- **Bridge.** It mirrors srt's `apply-seccomp`. It forks a stub that creates a
+  user+pid+mount namespace. Its pid 1 mounts a fresh `/proc`, sets `max_user_namespaces=0`,
+  reaps children and forwards signals. The command runs below it with `no_new_privs` and the
+  filter. The bridge and the stubs are non-dumpable.
+- **Proxy per exec.** Each exec gets its own filtering proxy on a fresh Unix socket. HTTP and
+  SOCKS5 share that socket and are told apart by the first byte. The socket is bound only into
+  that exec's sandbox, so attribution needs no proxy credentials. Per-exec allowlists cannot
+  leak between execs.
+- **Mount plan.** It follows srt:
+  - mounts are applied shallow-first;
+  - ancestor directories of write-denied paths are pinned;
+  - absent deny paths get placeholders, which are removed once no exec runs;
+  - a write deny inside a read-denied region is not re-bound.
+
+  `scratch_write` roots (the sandbox's own HOME/TMPDIR) skip the dangerous-file protection.
+- **Not taken from srt:**
+  - inheriting the host environment (we build it ourselves);
+  - `socat` (we use the Python bridge instead);
+  - globs, TLS termination, credential masking, parent proxies;
+  - macOS and Windows.
+- **Type checking.** pyright runs with `pythonPlatform = "Linux"`, the target platform.
+
+**Consequences:**
+- Runtimes that need nested user namespaces fail in the sandbox: Chromium's sandbox, rootless
+  podman, `unshare -r`.
+- So do runtimes that need AF_UNIX sockets, e.g. multiprocessing managers.
+- `allow_nested_userns` and `block_unix_sockets` exist for trusted cases only.
+- While an exec runs, the workspace shows empty read-only placeholders for protected names.
