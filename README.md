@@ -3,7 +3,31 @@
 A terminal app where you describe the agent you need and a builder agent designs, implements,
 runs, probes and fixes it — entirely inside a sandbox — using Pydantic AI.
 
-**Status:** design phase. Start with [design/README.md](design/README.md).
+It's for developers who want a working, tested agent from a description instead of hand-iterating
+on prompts and tools. Built with Python 3.14, [uv](https://docs.astral.sh/uv/),
+[Pydantic AI](https://ai.pydantic.dev), [Textual](https://textual.textualize.io) and
+bubblewrap.
+
+**Status:** early development. The design is in [design/README.md](design/README.md).
+
+Working today:
+
+- Chat TUI talking to the builder agent (Anthropic, Gemini or Vertex AI models).
+- Sandbox package: bubblewrap + seccomp isolation with domain-filtered network proxies, exposed
+  to the builder as a `run_bash` tool (Linux/WSL2).
+- Lint and type-check CI.
+
+## TODO
+
+Full plan in [design/09-roadmap.md](design/09-roadmap.md). Next up:
+
+- [ ] Spec models (`AgentSpec`, `Scenario`, `EvalReport`) with YAML round-trip tests.
+- [ ] Symlink-safe workspace file tools and host-side git checkpoints.
+- [ ] `agentbuilder doctor` prerequisite check and sandbox escape self-test.
+- [ ] Walking skeleton: implement → static checks → run scenarios → fix loop, headless.
+- [ ] Agent registry: versioned releases, list/search/run from the CLI.
+- [ ] TUI Spec/Files/Runs tabs and approval prompts.
+- [ ] macOS sandbox backend.
 
 ## Run the chat TUI
 

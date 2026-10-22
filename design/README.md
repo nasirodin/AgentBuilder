@@ -5,7 +5,8 @@ designs, implements, runs, probes and iteratively fixes *other* agents. Everythi
 writes or executes happens inside an isolated **sandbox**. Agents (both the builder and the
 agents it produces) are built on [Pydantic AI](https://ai.pydantic.dev).
 
-> Status: **design phase**. These documents describe intent, not existing code.
+> Status: **early development**. These documents describe the target design; see the main
+> README for what is implemented so far.
 > Anything marked **OPEN** is undecided — see [90-open-questions.md](90-open-questions.md).
 
 ## Reading order
