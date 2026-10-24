@@ -138,6 +138,9 @@ async def test_limits(dirs: dict[str, Path]) -> None:
     async with make(dirs) as sb:
         r = await sh(sb, "sleep 30", timeout_s=1)
         assert r.timed_out and r.duration_s < 10
+        # stdin larger than the pipe buffer, never read: the deadline still applies
+        r = await sh(sb, "sleep 30", stdin=b"x" * (4 << 20), timeout_s=1)
+        assert r.timed_out and r.duration_s < 10
         r = await sh(sb, "yes | head -c 100000")
         assert r.truncated and len(r.stdout) < 5000 and "bytes omitted" in r.stdout
         r = await sh(sb, "kill -TERM $$")

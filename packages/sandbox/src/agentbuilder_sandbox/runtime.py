@@ -304,6 +304,18 @@ async def _read(stream: asyncio.StreamReader | None, cap: _Capture) -> None:
         cap.feed(data)
 
 
+async def _write(stream: asyncio.StreamWriter | None, data: bytes | None) -> None:
+    if stream is None or data is None:
+        return
+    try:
+        stream.write(data)
+        await stream.drain()
+    except BrokenPipeError, ConnectionResetError:
+        pass
+    finally:
+        stream.close()
+
+
 def _rlimits(limits: ResourceLimits):
     def apply() -> None:
         import resource
@@ -349,13 +361,8 @@ async def _run(
         asyncio.create_task(_read(proc.stdout, out)),
         asyncio.create_task(_read(proc.stderr, err)),
     ]
-    if stdin is not None and proc.stdin is not None:
-        try:
-            proc.stdin.write(stdin)
-            await proc.stdin.drain()
-            proc.stdin.close()
-        except BrokenPipeError, ConnectionResetError:
-            pass
+    # Fed concurrently so a command that never reads stdin can't stall us past the deadline.
+    feeder = asyncio.create_task(_write(proc.stdin, stdin))
     timed_out = False
     try:
         await asyncio.wait_for(proc.wait(), timeout_s)
@@ -368,6 +375,9 @@ async def _run(
         raise
     finally:
         procs.discard(proc)
+        feeder.cancel()
+        if proc.stdin is not None:
+            proc.stdin.close()
     _, pending = await asyncio.wait(readers, timeout=5)
     for t in pending:
         t.cancel()
