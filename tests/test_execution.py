@@ -129,7 +129,13 @@ async def test_real_sandbox(tmp_path: Path) -> None:
             ["python3", "-"], stdin=b"import os; print(os.listdir(os.path.expanduser('~')))"
         )
         assert r.stdout == "[]\n"  # HOME is the session's empty scratch dir
-        r = await executor.run(["bash", "-c", f"ls {Path.home()}"])
-        assert r.stdout.strip() == ""  # the real home is hidden
+        # The real home is hidden, except the empty path skeleton bwrap creates to mount the
+        # sandbox runtime when it lives under home (e.g. a CI checkout in ~/work).
+        home = Path.home()
+        assert executor._sandbox is not None
+        runtime = [Path(p) for p in executor._sandbox._runtime_read]
+        skeleton = {p.relative_to(home).parts[0] for p in runtime if p.is_relative_to(home)}
+        r = await executor.run(["bash", "-c", f"ls -A {home}"])
+        assert set(r.stdout.split()) <= skeleton
     finally:
         await executor.aclose()
