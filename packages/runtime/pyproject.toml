@@ -1,0 +1,13 @@
+[project]
+name = "agentbuilder-runtime"
+version = "0.1.0"
+description = "Probe runner and trace schema, installed into target agent venvs"
+requires-python = ">=3.14"
+dependencies = [
+    "pydantic>=2.12",
+    "pyyaml>=6",
+]
+
+[build-system]
+requires = ["uv_build>=0.10,<0.11"]
+build-backend = "uv_build"

@@ -259,6 +259,7 @@ without exposing the value would require TLS interception — out of scope for v
 runs/<run_id>/
   run.json          # agent@version, mode, inputs (redacted), status, timings, usage, cost
   trace.json        # same trace format as probes
+  spans.jsonl       # OpenTelemetry spans, as for probes
   io/in/  io/out/   # input copies and produced files
   transcript.jsonl  # interactive mode
 ```

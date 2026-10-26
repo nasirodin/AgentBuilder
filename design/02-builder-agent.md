@@ -50,10 +50,10 @@ They share one `BuilderDeps` (sandbox handle, session, event emitter, budget tra
 |-------|-------------|----------------|
 | **Clarifier** | `Requirements \| Question` | `ask_user` |
 | **Architect** | `AgentSpec` | `ask_user`, `read_file`, `list_files`, `pip_search`* |
-| **Engineer** | `ImplementationResult` | file tools, `run_command`, `add_dependency`, `run_unit_tests` |
-| **Evaluator** | `EvalReport` (LLM-judge parts only; deterministic parts computed in code) | `read_trace` |
-| **Diagnostician** | `FixPlan` | `read_trace`, `read_file`, `grep`, `run_probe` (single scenario) |
-| **Front desk** | free text | `get_status`, `explain_spec`, `request_phase_change`, registry tools (`search_agents`, `describe_agent`, `run_agent`, `get_run`, `start_edit`) |
+| **Engineer** | `ImplementationResult` | file tools, `run_command`, `add_dependency`, `run_unit_tests`, `read_trace`, `read_spans` |
+| **Evaluator** | `EvalReport` (LLM-judge parts only; deterministic parts computed in code) | `read_trace`, `read_spans` |
+| **Diagnostician** | `FixPlan` | telemetry tools (`list_probes`, `read_trace`, `read_spans`, `compare_probes`), `read_file`, `grep`, `run_probe` (single scenario) |
+| **Front desk** | free text | `get_status`, `explain_spec`, `request_phase_change`, `list_probes`, `read_trace`, registry tools (`search_agents`, `describe_agent`, `run_agent`, `get_run`, `start_edit`) |
 
 \* Optional, network-dependent.
 
@@ -88,13 +88,21 @@ through `ctx.deps.sandbox.exec`, i.e. as a bubble-wrapped process
 | `run_checks()` | `ruff`, type checker, import smoke test of the agent module. |
 | `run_probe(scenario_id \| ad-hoc input)` | Run target agent once, return trace summary. |
 | `run_eval(subset?)` | Run full/partial scenario set → `EvalReport`. |
-| `read_trace(probe_id)` | Inspect a probe's full trace. |
+| `list_probes(iteration?, scenario_id?, failed_only?)` | Probes (and registry runs) with status, cost, duration, across iterations. |
+| `read_trace(probe_id, view?)` | A probe's trace: summary, messages, or tool calls (derived from the message history). |
+| `read_spans(probe_id, span_id?)` | Span tree with durations and status; drill into one span's attributes. |
+| `compare_probes(a, b)` | Two probes side by side (e.g. one scenario before/after a fix): tool sequence, output, timing. |
 | `update_spec(patch)` | Propose a spec change (requires approval if it changes criteria or tool surface). |
 | `ask_user(question, options?)` | Block on user input via the TUI. |
 | `checkpoint(message)` | Commit workspace state (git inside the workspace). |
 
 Tool results are **summarised** for the model (bounded size) with a handle to the full artifact,
 to keep context small during long loops.
+
+The telemetry tools (`list_probes`, `read_trace`, `read_spans`, `compare_probes`) read the
+traces and OpenTelemetry spans stored for every probe and run (see
+[05-eval-loop.md](05-eval-loop.md#telemetry)). They are read-only, hide holdout probes from
+the engineer and diagnostician, and label everything they return as untrusted data.
 
 ## Prompting principles
 

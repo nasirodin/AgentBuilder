@@ -40,7 +40,7 @@ wheel) executes, as a bubble-wrapped process:
 ```
 python -m agentbuilder_runtime.probe \
     --scenarios evals/scenarios.yaml [--ids a,b] [--repeat N] \
-    --model <model> --out runs/<iteration>/
+    --model <model> --out <session>/probes/it-<n>/
 ```
 
 For each case it builds deps, runs the agent (`agent.run` / `agent.iter` to capture each
@@ -51,8 +51,8 @@ node), and writes a **trace**:
   "probe_id": "it3-revenue_by_month-r1",
   "scenario_id": "revenue_by_month",
   "input": "...",
-  "messages": [ /* Pydantic AI ModelMessage history (all_messages_json) */ ],
-  "tool_calls": [{"name": "describe_table", "args": {...}, "ok": true, "duration_ms": 12}],
+  "model": "anthropic:claude-sonnet-5-5",
+  "messages": [ /* Pydantic AI ModelMessage history (all_messages_json), incl. tool calls */ ],
   "output": { /* Output model or text */ },
   "error": null,
   "usage": {"requests": 4, "input_tokens": 3120, "output_tokens": 410, "cost_usd": 0.012},
@@ -65,6 +65,43 @@ node), and writes a **trace**:
   that flip are flagged `flaky`.
 - Ad-hoc probing: the builder (or the user via `/probe "..."`) can run a single input without
   a scenario, to explore behavior.
+
+### Telemetry
+
+Every probe also records Pydantic AI's **OpenTelemetry spans**, so the builder can see *how* a
+run unfolded (timing, nesting, retries), not only the final message history. Telemetry is kept
+for every agent we build and is available to the builder agents during evaluation and
+debugging.
+
+- **Capture.** The runner instruments the agent
+  (`Agent.instrument_all(InstrumentationSettings(tracer_provider=..., include_content=True))`)
+  with an OTel SDK tracer provider whose exporter writes JSON lines to
+  `<probe_id>.spans.jsonl` next to the trace. A per-span processor writes each span as it ends,
+  so a run killed by its timeout keeps every finished span. There is no network exporter: the
+  sandbox has no network and needs none for this.
+- **Content.** Nested spans for the agent run, each model request (model, tokens, latency,
+  finish reason) and each tool execution (arguments, result, duration, exception). Spans the
+  agent's own code or libraries emit land in the same file. Files are size-capped; oversized
+  attribute values are truncated with a marker.
+- **Roles.** The trace is what the evaluators score; spans are for timing and diagnosis
+  (deterministic latency checks may read span durations). Neither is authoritative for spend:
+  both are written inside the sandbox by the process that runs agent code, so cost comes from
+  the model proxy.
+- **Storage.** The probe batch's output directory is writable only during that probe exec and
+  host-owned afterwards, so later sandboxed commands cannot rewrite past telemetry (see
+  [07-state-and-persistence.md](07-state-and-persistence.md#telemetry)). Telemetry is kept for
+  every iteration of every build session and for every registry run, subject to retention. An
+  edit session of a released agent can read the telemetry of the session that built its base
+  version and of that version's runs.
+- **Builder access.** Read-only tools (`list_probes`, `read_trace`, `read_spans`,
+  `compare_probes`; see [02-builder-agent.md](02-builder-agent.md#builder-tools)) let the
+  evaluator, engineer and diagnostician query probes across iterations, e.g. the same scenario
+  before and after a fix. Results are bounded summaries with handles to drill down.
+- **Untrusted content.** Traces and spans contain model output, tool results and fixture data.
+  Tools hand them to builder agents labelled as data; instructions inside them are never
+  followed.
+- **Export (optional).** The host can forward stored spans to a user-configured OTLP endpoint
+  (e.g. Logfire) for viewing; never from inside the sandbox.
 
 ## 3. Evaluate
 
@@ -92,6 +129,8 @@ cases that previously passed (configurable).
 ## 4. Diagnose
 
 The diagnostician receives the report, failing traces (summarised), the spec and relevant files.
+It drills into traces and spans of any visible probe, from this or earlier iterations, with the
+telemetry tools (e.g. comparing a failing case with its last passing run).
 It must output a `FixPlan`:
 
 ```python
@@ -143,6 +182,7 @@ fails, best hypothesis, and concrete questions or options for the user.
 - Scenario expectations, judge rubrics and criteria are read-only to the engineer (enforced by
   the file tools, not just the prompt).
 - A hidden **holdout** subset (architect-generated, never shown to diagnose/fix agents) is
-  evaluated at Done to detect overfitting to visible cases.
+  evaluated at Done to detect overfitting to visible cases. The telemetry tools hide holdout
+  probes from those agents too.
 - Hard-coding detection: deterministic check that scenario input strings don't appear verbatim
   in source files.

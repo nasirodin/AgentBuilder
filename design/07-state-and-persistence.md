@@ -13,6 +13,10 @@
         <run_id>.json
       reports/
         it-<n>.json                    # EvalReport per iteration
+      probes/
+        it-<n>/                        # one probe batch (writable only during its probe exec)
+          <probe_id>.json              # trace
+          <probe_id>.spans.jsonl       # OpenTelemetry spans
       artifacts/                       # large tool outputs, full logs (by id)
       workspace/                       # target project; the only writable dir for sandboxed processes
       tmp/  uv-cache/                  # session scratch, writable by sandboxed processes
@@ -43,6 +47,16 @@ Persisted after every event that changes it (small JSON, atomic write via temp f
 On crash/restart, `agentbuilder resume <id>` restores the session, kills any orphaned sandboxed
 process groups, rebuilds the sandbox policy, restarts the proxies, and continues from the last completed step (phase runs are idempotent at the step
 level: a half-finished phase run is restarted from its beginning on the last checkpoint).
+
+## Telemetry
+
+Probe traces and spans live under `probes/`, outside the workspace. The runner's output
+directory is bound writable only into its own probe exec; afterwards it is host-owned and
+read-only to every later sandboxed command, so target-agent code cannot rewrite past
+telemetry. Telemetry is kept for the life of the session and is not deleted on release: an
+edit session of `name@N` reads the telemetry of the session that built it (provenance records
+the session id). Retention (age / size, configurable) prunes spans of old iterations first and
+keeps the traces of the best and released iterations.
 
 ## Checkpoints
 

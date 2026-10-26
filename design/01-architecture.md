@@ -49,7 +49,7 @@ flowchart LR
 | **Agent registry** | One bare git repo per agent (versions = tags) plus an index (SQLite + FTS); list/search/version/import/export. See [08-agent-registry.md](08-agent-registry.md). | Trusted (repo contents untrusted) |
 | **Run manager** | Spins up released agents in the sandbox for real tasks (one-shot, interactive, background, batch); keeps run records. | Trusted |
 | **Model proxy** | Small reverse proxy that forwards target-agent model calls to providers, injecting real API keys and enforcing budget. Exposed to the sandbox as a bridged service (per-session Unix socket → loopback port inside). | Trusted |
-| **Probe runner** | A tiny package installed into the target project's venv that imports the target agent, runs a scenario, and writes a JSON trace. | Runs sandboxed |
+| **Probe runner** | A tiny package installed into the target project's venv that imports the target agent, runs a scenario, and writes a JSON trace plus OpenTelemetry spans. | Runs sandboxed |
 | **Target agent** | Generated code. Assumed hostile. | Untrusted |
 
 ## Key boundaries

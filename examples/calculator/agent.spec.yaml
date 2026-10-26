@@ -1,0 +1,20 @@
+# Hand-written spec for the M2 walking-skeleton demo (design/09-roadmap.md).
+version: 1
+name: calculator-agent
+purpose: Answer arithmetic questions, including word problems, with an exact numeric result.
+model: anthropic:claude-haiku-5-5
+instructions_file: src/calculator_agent/prompts/system.md
+output:
+  kind: structured
+  schema_ref: calculator_agent.agent:Output
+tools:
+  - name: evaluate
+    purpose: Evaluate an arithmetic expression (+ - * / ** and parentheses) exactly
+    backed_by: calc.evaluate
+domain_library:
+  package: calc
+  rationale: Arithmetic is deterministic and must not be done by the model.
+  modules: [parser, evaluate]
+acceptance:
+  min_pass_rate: 1.0
+  max_cost_per_run_usd: 0.01

@@ -5,9 +5,11 @@ description = "Terminal app that builds, probes and fixes Pydantic AI agents in 
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "agentbuilder-runtime",
     "agentbuilder-sandbox",
     "pydantic-ai-slim[anthropic,google]>=2.59.0",
     "pydantic-settings>=2.16.1",
+    "pyyaml>=6",
     "textual>=4",
 ]
 
@@ -19,9 +21,10 @@ requires = ["uv_build>=0.10,<0.11"]
 build-backend = "uv_build"
 
 [tool.uv.workspace]
-members = ["packages/sandbox"]
+members = ["packages/runtime", "packages/sandbox"]
 
 [tool.uv.sources]
+agentbuilder-runtime = { workspace = true }
 agentbuilder-sandbox = { workspace = true }
 
 [dependency-groups]
@@ -34,11 +37,18 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests", "packages/sandbox/tests"]
+testpaths = ["tests", "packages/runtime/tests", "packages/sandbox/tests"]
 
 [tool.pyright]
 # Standard mode; missing stubs are noise for the untyped deps we use.
-include = ["src", "tests", "packages/sandbox/src", "packages/sandbox/tests"]
+include = [
+    "src",
+    "tests",
+    "packages/runtime/src",
+    "packages/runtime/tests",
+    "packages/sandbox/src",
+    "packages/sandbox/tests",
+]
 pythonVersion = "3.14"
 typeCheckingMode = "standard"
 reportMissingTypeStubs = false
@@ -69,4 +79,4 @@ select = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["agentbuilder", "agentbuilder_sandbox"]
+known-first-party = ["agentbuilder", "agentbuilder_runtime", "agentbuilder_sandbox"]

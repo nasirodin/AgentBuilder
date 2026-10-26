@@ -25,6 +25,8 @@ parts (sandbox + loop) early.
 ## M2 — Walking skeleton (headless)
 - Single engineer agent with file + exec tools; spec provided as YAML (no clarify/design yet).
 - Probe runner + trace format; deterministic evaluators only.
+- Telemetry: OpenTelemetry spans per probe, stored per session; `list_probes`, `read_trace`,
+  `read_spans` for the engineer.
 - Orchestrator loop: implement → static gate → probe → evaluate → (fix) with budgets.
 - Model proxy as a sandbox service (keys out of sandbox).
 - Demo: build a trivial calculator agent from a hand-written spec until it passes.
@@ -33,7 +35,7 @@ parts (sandbox + loop) early.
 - Manifest, per-agent bare git repos (versions = tags), release from a session, SQLite/FTS index.
 - Export (git bundle / project / archive) and quarantined import.
 - `agents list/show/search/versions/use/archive/delete/export/import`.
-- Run manager: run policy, env cache, one-shot `agentbuilder run`, run records.
+- Run manager: run policy, env cache, one-shot `agentbuilder run`, run records (trace + spans).
 - Secrets via keyring, declared-secret injection gated by approved domains.
 - Demo: release the M2 calculator agent and run it on new tasks.
 
@@ -43,7 +45,8 @@ parts (sandbox + loop) early.
 - Event stream wiring; pause/interrupt; background runs with notifications.
 
 ## M5 — Full builder phases
-- Clarifier, architect (spec generation incl. scenarios), diagnostician with `FixPlan`.
+- Clarifier, architect (spec generation incl. scenarios), diagnostician with `FixPlan` and
+  `compare_probes`; edit sessions read the base version's telemetry.
 - LLM-judge evaluators via `pydantic_evals`.
 - Approval gates for spec changes, dependencies, network.
 - Edit/clone sessions seeded from a registry version, with regression gate.
@@ -58,7 +61,8 @@ parts (sandbox + loop) early.
 - Checkpoints, rollback, best-checkpoint revert, resume after crash.
 - Repeats/flakiness, holdout set, anti-gaming checks, stagnation detection.
 - Network approval callback wired to the TUI ("allow this domain once / always / deny").
-- Run feedback → regression scenario → edit session; batch runs; run retention.
+- Run feedback → regression scenario → edit session; batch runs; run and telemetry retention.
+- Optional forwarding of stored spans to an OTLP endpoint (e.g. Logfire).
 - macOS backend (Seatbelt profile generation).
 
 ## M8 — Meta-evaluation of the builder

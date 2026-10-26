@@ -1,0 +1,33 @@
+cases:
+  - id: simple_sum
+    input: What is 17 + 25?
+    expect:
+      tools_called_include: [evaluate]
+      output_matches:
+        result: 42
+    tags: [happy-path]
+  - id: precedence
+    input: Compute 2 + 3 * 4 ** 2
+    expect:
+      tools_called_include: [evaluate]
+      output_matches:
+        result: 50
+    tags: [happy-path]
+  - id: word_problem
+    input: >-
+      A box holds 12 eggs. I buy 7 boxes and break 5 eggs on the way home.
+      How many eggs are left?
+    expect:
+      tools_called_include: [evaluate]
+      output_matches:
+        result: 79
+    tags: [word-problem]
+  - id: division_by_zero
+    input: What is 10 / (5 - 5)?
+    expect:
+      max_tool_calls: 3
+      output_matches:
+        result: null
+      output_regex:
+        error: (?i)zero
+    tags: [error-handling]

@@ -165,3 +165,27 @@ be plain git remotes.
 - So do runtimes that need AF_UNIX sockets, e.g. multiprocessing managers.
 - `allow_nested_userns` and `block_unix_sockets` exist for trusted cases only.
 - While an exec runs, the workspace shows empty read-only placeholders for protected names.
+
+### D13 — Keep OpenTelemetry spans for every probe and run; builder agents can query them
+**Status:** accepted · 2026-10-26
+**Context:** The trace (`trace.json`) holds Pydantic AI's message history plus what it does not
+record (probe/scenario ids, output, error). It has no timing or nesting, which diagnosis needs
+("which tool was slow", "where did the retries happen"). Pydantic AI already emits
+OpenTelemetry spans for agent runs, model requests and tool executions. Using spans *instead*
+of the trace was rejected: spans lose unflushed data when a run is killed, carry no scenario
+context, and their attributes vary by instrumentation version.
+**Decision:**
+- The probe runner (and the run entry point) records the agent's spans to
+  `<probe_id>.spans.jsonl` next to the trace, via a file exporter inside the sandbox.
+- Traces and spans are stored host-side per session (`probes/it-<n>/`) and per registry run,
+  kept across releases, and pruned only by retention.
+- Builder agents read them through read-only telemetry tools (`list_probes`, `read_trace`,
+  `read_spans`, `compare_probes`) during evaluation and debugging.
+
+**Consequences:**
+- `agentbuilder_runtime` depends on `opentelemetry-sdk` (installed into target venvs).
+- Telemetry is written by the process that runs agent code, so it is informative, not
+  authoritative: spend comes from the model proxy, and holdout probes stay hidden from the
+  engineer and diagnostician.
+- Span content is untrusted data in builder prompts.
+- Storage grows with iterations; a retention policy is needed (M7).

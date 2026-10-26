@@ -25,9 +25,11 @@ runner, evaluator and exporter work on any target agent without guessing.
   evals/
     scenarios.yaml               # cases + expectations (owned by spec, not engineer)
     fixtures/                    # input data used by scenarios
-  runs/                          # probe traces & eval reports (gitignored, kept as artifacts)
   README.md                      # generated usage docs
 ```
+
+Probe traces, spans and eval reports are kept in the session, outside the workspace (see
+[07-state-and-persistence.md](07-state-and-persistence.md#telemetry)).
 
 ## Entry-point contract
 
@@ -100,7 +102,8 @@ acceptance:
       description: Proposed SQL never contains non-SELECT statements.
   max_cost_per_run_usd: 0.05
 changelog:
-  - v3: Require describe_table before referencing a column.
+  - version: 3
+    summary: Require describe_table before referencing a column.
 ```
 
 The spec is versioned; each approved change bumps `version` and appends to `changelog`.
@@ -129,7 +132,11 @@ Heuristic the architect uses to decide *library vs. prompt-only*:
 
 ## Scenarios
 
-`evals/scenarios.yaml` (maps to `pydantic_evals.Dataset`):
+`evals/scenarios.yaml` (`agentbuilder_runtime.scenarios.ScenarioSet`; maps to
+`pydantic_evals.Dataset`). Deterministic expectations: `tools_called_include`,
+`tools_called_exclude`, `tools_called_in_order`, `max_tool_calls`, `output_matches` and
+`output_regex` (dotted paths into the output, `""` for the whole output), `hard`,
+`max_cost_usd`, `max_duration_s`; plus the optional `judge` rubric. Unknown keys are rejected.
 
 ```yaml
 cases:
